@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
+
+  <PropertyGroup>
+    <TargetFramework>net461</TargetFramework>
+    <BuildHostSecretPrefix>UITestSecret_</BuildHostSecretPrefix>
+    <XamarinUITestVersion>2.2.7</XamarinUITestVersion>
+    <TestToolsPath>$(NuGetPackageRoot)xamarin.uitest\$(XamarinUITestVersion)\tools\test-cloud.exe</TestToolsPath>
+    <TestToolsPath Condition=" !Exists('$(TestCloudPath)') ">$(ProgramW6432)\dotnet\sdk\NuGetFallbackFolder\xamarin.uitest\$(XamarinUITestVersion)\tools\test-cloud.exe</TestToolsPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <TestTools Include="$(TestToolsPath)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="2.7.0" />
+    <PackageReference Include="Xamarin.UITest" Version="$(XamarinUITestVersion)" />
+    <PackageReference Include="NUnitTestAdapter" Version="2.1.1" />
+  </ItemGroup>
+
+  <Target Name="TestCloudExeCopy">
+    <Copy SourceFiles="@(TestTools)"
+          DestinationFolder="$(OutputPath)"
+          ContinueOnError="true" />
+  </Target>
+
+</Project>

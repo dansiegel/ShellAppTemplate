@@ -1,0 +1,69 @@
+parameters:
+  dependsOn: ''
+  displayName: ''
+  phaseName: ''
+  artifactName: ''
+  solution: '**/*.sln'
+  buildConfiguration: 'Release'
+  certificateFile: ''
+  certificatePassword: ''
+  provisioningProfile: ''
+  appcenterSecret: ''
+  backendUri: ''
+
+phases:
+- phase: ${{ parameters.phaseName }}
+  displayName: ${{ parameters.displayName }}
+  dependsOn: ${{ parameters.dependsOn }}
+  condition: succeeded()
+  queue:
+    name: Hosted macOS
+    demands:
+    - xcode
+    - Xamarin.iOS
+
+  steps:
+  - task: InstallAppleCertificate@2
+    displayName: 'Install an Apple certificate'
+    inputs:
+      certSecureFile: ${{ parameters.certificateFile }}
+      certPwd: ${{ parameters.certificatePassword }}
+
+  - task: InstallAppleProvisioningProfile@1
+    displayName: 'Install an Apple provisioning profile'
+    inputs:
+      provProfileSecureFile: ${{ parameters.provisioningProfile }}
+
+  - task: vs-publisher-473885.motz-mobile-buildtasks.ios-bundle-version.ios-bundle-version@0
+    displayName: 'Bump iOS Versions in Info.plist'
+    inputs:
+      sourcePath: shell/ShellApp.iOS/Info.plist
+
+  - template: ../steps/nuget-restore.yml
+    parameters:
+      solution: ${{ parameters.solution }}
+
+  - bash: |
+       # To manually select a Xamarin SDK version on the Hosted macOS agent, run this script with the SDK version you want to target
+       # https://go.microsoft.com/fwlink/?linkid=871629
+
+       sudo $AGENT_HOMEDIRECTORY/scripts/select-xamarin-sdk.sh 5_12_0
+    displayName: 'Select Xamarin SDK version'
+
+  - template: ../steps/generate-secrets.yml
+    parameters:
+      appcenterSecret: ${{ parameters.appcenterSecret }}
+      backendUri: ${{ parameters.backendUri }}
+
+  - task: XamariniOS@2
+    displayName: 'Build Xamarin.iOS solution **/*.iOS.csproj'
+    inputs:
+      solutionFile: '**/*.iOS.csproj'
+      configuration: ${{ parameters.buildConfiguration }}
+    args: '/p:OutputPath=''$(Build.BinariesDirectory)/app'''
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact'
+    inputs:
+      PathtoPublish: '$(Build.BinariesDirectory)/app'
+      ArtifactName: ${{ parameters.artifactName }}

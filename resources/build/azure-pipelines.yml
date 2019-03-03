@@ -1,0 +1,101 @@
+trigger:
+  branches:
+    include:
+    - master
+    - dev
+  paths:
+    exclude:
+    - README.md
+    - LICENSE
+    - Clean-Outputs.ps1
+    - .gitignore
+    - .gitattributes
+    - .editorconfig
+
+name: $(Build.BuildId)
+
+variables:
+- name: BuildConfiguration
+  value: Release
+- name: TargetSolution
+  value: '**/*.sln'
+
+phases:
+- template: phases/build-module.yml
+
+- template: phases/android.yml
+  parameters:
+    dependsOn: 'BuildModule'
+    displayName: 'Build Android App for UI Tests'
+    phaseName: 'Android-UITests'
+    artifactName: 'AndroidUITest'
+    solution: '**/*.sln'
+    keystoreFileName: '$(KeystoreFileName)'
+    keystoreAlias: '$(KeystoreAlias)'
+    keystorePassword: '$(KeystorePassword)'
+    appcenterSecret: ''
+    backendUri: '$(MockBackend)'
+
+- template: phases/ios.yml
+  parameters:
+    dependsOn: 'BuildModule'
+    displayName: 'Build iOS App for UI Tests'
+    phaseName: 'iOS-UITests'
+    artifactName: 'iOSUITest'
+    solution: $(TargetSolution)
+    buildConfiguration: 'UITest'
+    certificateFile: '$(iOSCertificateFile)'
+    certificatePassword: '$(iOSCertificatePassword)'
+    provisioningProfile: '$(iOSProvisioningProfile)'
+    appcenterSecret: ''
+    backendUri: '$(MockBackend)'
+
+- template: phases/run-uitests.yml
+  parameters:
+    phase: 'RunAndroidUITest'
+    displayName: 'Android UI Tests'
+    dependsOn: 'Android-UITests'
+    artifactName: 'AndroidUITest'
+    appFile: '$(System.ArtifactsDirectory)/*.apk'
+    appSlug: '$AndroidAppCenterSlug)'
+    devices: '$(AndroidAppCenterDevices)'
+    series: 'beta'
+
+- template: phases/run-uitests.yml
+  parameters:
+    phase: 'RuniOSUITest'
+    displayName: 'iOS UI Tests'
+    dependsOn: 'iOS-UITests'
+    artifactName: 'iOSUITest'
+    appFile: '$(System.ArtifactsDirectory)/*.ipa'
+    dsymDirectory: '$(System.ArtifactsDirectory)'
+    appSlug: '$(iOSAppCenterSlug)'
+    devices: '$(iOSAppCenterDevices)'
+    series: 'beta'
+
+- template: phases/android.yml
+  parameters:
+    dependsOn: 'RunAndroidUITest'
+    displayName: 'Build Android App for Distribution'
+    phaseName: 'AndroidDistribution'
+    artifactName: 'Android-Distribution'
+    solution: '**/*.sln'
+    keystoreFileName: '$(KeystoreFileName)'
+    keystoreAlias: '$(KeystoreAlias)'
+    keystorePassword: '$(KeystorePassword)'
+    appcenterSecret: '$(AndroidAppCenterSecret)'
+    backendUri: '$(BackendUri)'
+
+- template: phases/ios.yml
+  parameters:
+    dependsOn: 'RuniOSUITest'
+    displayName: 'Build iOS App for Distribution'
+    phaseName: 'iOSDistribution'
+    artifactName: 'iOS'
+    solution: $(TargetSolution)
+    buildConfiguration: 'AppStore'
+    certificateFile: '$(iOSCertificateFile)'
+    certificatePassword: '$(iOSCertificatePassword)'
+    provisioningProfile: '$(iOSProvisioningProfile)'
+    appcenterSecret: '$(iOSAppCenterSecret)'
+    backendUri: '$(BackendUri)'

@@ -1,0 +1,51 @@
+parameters:
+  phase: ''
+  displayName: ''
+  dependsOn: ''
+  solution: '**/*.sln'
+  artifactName: ''
+  appFile: ''
+  dsymDirectory: ''
+  appSlug: ''
+  devices: ''
+  series: 'master'
+
+phases:
+- phase: ${{ parameters.phase }}
+  displayName: ${{ parameters.displayName }}
+  dependsOn: ${{ parameters.dependsOn }}
+  condition: succeeded()
+  queue:
+    name: windows-2019
+
+  steps:
+    - template: ../steps/nuget-restore.yml
+    parameters:
+      solution: ${{ parameters.solution }}
+
+  - task: MSBuild@1
+    displayName: 'Build UI Test Project'
+    inputs:
+      solution: '**/*.UITests.csproj'
+      platform: 'Any CPU'
+      configuration: 'Release'
+      msbuildArguments: '/p:OutputPath=$(Build.BinariesDirectory)'
+
+  - task: DownloadBuildArtifacts@0
+    displayName: 'Download Build Artifacts'
+    inputs:
+      artifactName: ${{ parameters.artifactName }}
+    downloadPath: '$(System.ArtifactsDirectory)'
+
+  - task: AppCenterTest@1
+    displayName: 'Run Tests with Visual Studio App Center'
+    inputs:
+      appFile: ${{ parameters.appFile }}
+      frameworkOption: uitest
+      uiTestToolsDirectory: '$(Build.BinariesDirectory)/tools'
+      uiTestBuildDirectory: '$(Build.BinariesDirectory)'
+      serverEndpoint: $(AppCenterServiceName)
+      dsymDirectory: ${{ parameters.dsymDirectory }}
+      appSlug: ${{ parameters.appSlug }}
+      devices: ${{ parameters.devices }}
+      series: ${{ parameters.series }}

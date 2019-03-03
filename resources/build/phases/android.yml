@@ -1,0 +1,61 @@
+parameters:
+  dependsOn: ''
+  displayName: ''
+  phaseName: ''
+  artifactName: ''
+  solution: '**/*.sln'
+  keystoreFileName: ''
+  keystoreAlias: ''
+  keystorePassword: ''
+  appcenterSecret: ''
+  backendUri: ''
+
+phases:
+- phase: ${{ parameters.phaseName }}
+  displayName: ${{ parameters.displayName }}
+  dependsOn: ${{ parameters.dependsOn }}
+  condition: succeeded()
+  queue:
+    name: Hosted macOS
+    demands:
+    - MSBuild
+    - Xamarin.Android
+    - JDK
+    - AndroidSDK
+
+  steps:
+  - task: vs-publisher-473885.motz-mobile-buildtasks.android-manifest-version.android-manifest-version@0
+    displayName: 'Bump Android Versions in AndroidManifest.xml'
+    inputs:
+      sourcePath: shell/ShellApp.Android/Properties/AndroidManifest.xml
+
+  - template: ../steps/nuget-restore.yml
+    parameters:
+      solution: ${{ parameters.solution }}
+
+  - template: ../steps/generate-secrets.yml
+    parameters:
+      appcenterSecret: ${{ parameters.appcenterSecret }}
+      backendUri: ${{ parameters.backendUri }}
+
+  - task: XamarinAndroid@1
+    displayName: 'Build Xamarin.Android project **/*Android*.csproj'
+    inputs:
+      projectFile: '**/*Android*.csproj'
+      outputDirectory: '$(Build.BinariesDirectory)/$(BuildConfiguration)'
+      configuration: ${{ parameters.buildConfiguration }}
+
+  - task: AndroidSigning@3
+    displayName: 'Signing and aligning APK file(s) $(Build.BinariesDirectory)/$(BuildConfiguration)/*.apk'
+    inputs:
+      apkFiles: '$(Build.BinariesDirectory)/$(BuildConfiguration)/*.apk'
+      apksignerKeystoreFile: ${{ parameters.keystoreFileName }}
+      apksignerKeystorePassword: ${{ parameters.keystorePassword }}
+      apksignerKeystoreAlias: ${{ parameters.keystoreAlias }}
+      apksignerKeyPassword: ${{ parameters.keystorePassword }}
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact'
+    inputs:
+      PathtoPublish: '$(Build.BinariesDirectory)/$(BuildConfiguration)'
+      ArtifactName: ${{ parameters.artifactName }}

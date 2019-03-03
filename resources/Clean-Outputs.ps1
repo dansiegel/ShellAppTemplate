@@ -1,0 +1,2 @@
+Get-ChildItem .\ -include bin,obj -Recurse | ForEach ($_) { Remove-Item $_.FullName -Force -Recurse }
+Get-ChildItem .\ -include .vs -Attributes Hidden -Recurse | ForEach ($_) { Remove-Item $_.FullName -Force -Recurse }

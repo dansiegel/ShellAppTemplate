@@ -1,0 +1,46 @@
+trigger:
+- master
+
+name: $(Build.BuildId)
+
+pool:
+  vmImage: windows-2019
+
+variables:
+  BuildPlatform: 'Any CPU'
+  BuildConfiguration: 'Release'
+
+steps:
+- task: NuGetToolInstaller@0
+  displayName: Use NuGet 4.9.3
+  inputs:
+    versionSpec: 4.9.3
+
+- task: NuGetCommand@2
+  displayName: 'NuGet restore'
+
+- task: MSBuild@1
+  displayName: Build Solution
+  inputs:
+    platform: '$(BuildPlatform)'
+    configuration: '$(BuildConfiguration)'
+
+- powershell: ./Sign-Packages.ps1
+  workingDirectory: build
+  displayName: Authenticode Sign Artifacts
+  env:
+    SignClientUser: $(SignClientUser)
+    SignClientSecret: $(SignClientSecret)
+    SignClientAADInstance: $(SignClientAADInstance)
+    SignClientClientId: $(SignClientClientId)
+    SignClientTenantId: $(SignClientTenantId)
+    SignServiceUrl: $(SignServiceUrl)
+    SignServiceResourceId: $(SignServiceResourceId)
+  condition: and(succeeded(), eq(variables['system.pullrequest.isfork'], false))
+
+- task: PublishBuildArtifacts@1
+  displayName: Publish Package Artifacts
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: NuGet
+  condition: and(succeeded(), eq(variables['system.pullrequest.isfork'], false))

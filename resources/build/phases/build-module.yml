@@ -1,0 +1,53 @@
+parameters:
+  solution: '**/*.sln'
+
+phases:
+- phase: BuildModule
+  displayName: Run Tests
+  condition: succeeded()
+  queue:
+    name: windows-2019
+
+  steps:
+  - template: ../steps/nuget-restore.yml
+    parameters:
+      solution: ${{ parameters.solution }}
+
+  - template: ../steps/generate-secrets.yml
+    parameters:
+      appcenterSecret: ''
+      backendUri: ''
+
+  - task: MSBuild@1
+    displayName: 'Build Module'
+    inputs:
+      platform: 'Any CPU'
+      configuration: 'Release'
+      msbuildArguments: '/p:DebugType=portable'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'dotnet test'
+    inputs:
+      command: test
+      projects: 'tests/**/*.Tests.csproj'
+      arguments: '-c $(BuildConfiguration) --collect:"Code Coverage" --no-build'
+
+  - powershell: ./Sign-Packages.ps1
+    workingDirectory: build
+    displayName: Authenticode Sign Artifacts
+    env:
+      SignClientUser: $(SignClientUser)
+      SignClientSecret: $(SignClientSecret)
+      SignClientAADInstance: $(SignClientAADInstance)
+      SignClientClientId: $(SignClientClientId)
+      SignClientTenantId: $(SignClientTenantId)
+      SignServiceUrl: $(SignServiceUrl)
+      SignServiceResourceId: $(SignServiceResourceId)
+    condition: and(succeeded(), not(eq(variables['build.reason'], 'PullRequest')), not(eq(variables['SignClientSecret'], '')), not(eq(variables['SignClientUser'], '')))
+
+  - task: PublishBuildArtifacts@1
+    displayName: Publish Package Artifacts
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: NuGet
+    condition: and(succeeded(), eq(variables['system.pullrequest.isfork'], false))
